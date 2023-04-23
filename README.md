@@ -6,3 +6,4 @@ This is about trying to get frames from a CSI camera plugged into a Nano and the
 Reason to  do this is to find alternatives to gstreamer and libargus, let's see where this goes.
 It is all about performance really.
 
+Nothing working/not finished yet.
