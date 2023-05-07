@@ -1,6 +1,6 @@
 /*
  *Testing the V4l2 API on a jetson nano
- *Compile with: gcc -Wall -g -o v4l2_test1 v4l2_test1.c 
+ *Compile with: gcc -Wall -Werror -g -o v4l2_test1 v4l2_test1.c -lrt
 */
 
 #include <stdio.h>
@@ -9,18 +9,19 @@
 #include <stdint.h>
 #include <errno.h>
 #include <unistd.h>
-#include <sys/ioctl>
+#include <sys/ioctl.h>
 #include <linux/videodev2.h>
-//#include <sys/fcntl.h>
-//#include <sys/mman.h>
+#include <sys/fcntl.h>
+#include <sys/mman.h>
 
-int main(int argc, char **argv){
+int main(void){
     int fd;
+    
     if((fd = open("/dev/video0", O_RDWR)) < 0){
         perror("failed to open");
         exit(-1);
     }
-    
+
     //Query device capabilities
     struct v4l2_capability cap;
     if(ioctl(fd, VIDIOC_QUERYCAP, &cap) < 0){
@@ -45,7 +46,7 @@ int main(int argc, char **argv){
         perror("VIDIOC_S_FMT");
         exit(-1);
     }
-    
+        
     //Buffer request
     struct v4l2_requestbuffers bufrequest;
     bufrequest.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -76,7 +77,7 @@ int main(int argc, char **argv){
         PROT_READ | PROT_WRITE,
         MAP_SHARED,
         fd,
-        bufferinfo.offset);
+        bufferinfo.m.offset);
  
     if(buffer_start == MAP_FAILED){
         perror("mmap");
