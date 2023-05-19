@@ -1,6 +1,7 @@
 /*
  *Testing the V4l2 API on a jetson nano
- *Compile with: gcc -Wall -Werror -g -o v4l2_test1 v4l2_test1.c -lrt 
+ *Compile with: gcc -Wall -Werror -o v4l2_test1 v4l2_test1.c -lrt
+ *Execute with: sudo ./v4l2_test1
 */
 
 #include <stdio.h>
@@ -15,8 +16,6 @@
 #include <linux/videodev2.h> 
 
 int main(void){
-
-    printf("I can start\n");
     
     int fd;
     
@@ -29,7 +28,7 @@ int main(void){
 
     struct v4l2_capability cap;
     if (ioctl(fd, VIDIOC_QUERYCAP, &cap) < 0){
-        perror("VIDIOC_QUERYCAP");
+        perror("Failed to query capabilities");
         exit(EXIT_FAILURE);
     }
 
@@ -38,13 +37,13 @@ int main(void){
         exit(EXIT_FAILURE);
     }
 
-    if (!(cap.capabilities & V4L2_CAP_READWRITE)){
-        fprintf(stderr, "The device does not support read/write.\n");
-        exit(EXIT_FAILURE);
-    }
+    /* if (!(cap.capabilities & V4L2_CAP_READWRITE)){ */
+    /*     fprintf(stderr, "The device does not support read/write.\n"); */
+    /*     exit(EXIT_FAILURE); */
+    /* } */
 
-    if (!(cap,capabilities & V4L2_CAP_STREAMING)){
-        fprint(stderr, "The device does not support streaming.\n");
+    if (!(cap.capabilities & V4L2_CAP_STREAMING)){
+        fprintf(stderr, "The device does not support streaming.\n");
         exit(EXIT_FAILURE);
     }
     
@@ -58,83 +57,79 @@ int main(void){
     format.fmt.pix.height = 720;
     format.fmt.pix.field = V4L2_FIELD_NONE;
     
-    if(ioctl(fd, VIDIOC_S_FMT, &format) < 0){
+    if (ioctl(fd, VIDIOC_S_FMT, &format) < 0){
         perror("Could not set video format");
         exit(EXIT_FAILURE);
     }
-    printf("I arrive to the third\n");
     
     //Buffer request
-    struct v4l2_requestbuffers bufrequest;
+    struct v4l2_requestbuffers bufrequest = {0};
     bufrequest.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     bufrequest.memory = V4L2_MEMORY_MMAP;
     bufrequest.count = 1;
  
     if(ioctl(fd, VIDIOC_REQBUFS, &bufrequest) < 0){
-        perror("VIDIOC_REQBUFS");
+        perror("Failed buffer request");
         exit(EXIT_FAILURE);
     }
-    printf("I arrive to the fourth\n");
     
-    //Allocate buffers
-    struct v4l2_buffer bufferinfo;
-    memset(&bufferinfo, 0, sizeof(bufferinfo));
+    //Query buffers
+    struct v4l2_buffer bufferinfo = {0};
  
     bufferinfo.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     bufferinfo.memory = V4L2_MEMORY_MMAP;
     bufferinfo.index = 0;
  
-    if(ioctl(fd, VIDIOC_QUERYBUF, &bufferinfo) < 0){
-        perror("VIDIOC_QUERYBUF");
+    if (ioctl(fd, VIDIOC_QUERYBUF, &bufferinfo) < 0){
+        perror("Failed to query buffers");
         exit(EXIT_FAILURE);
     }
-    printf("I arrive to the fifth\n");
     
-    void* buffer_start = mmap(
-        NULL,
-        bufferinfo.length,
-        PROT_READ | PROT_WRITE,
-        MAP_SHARED,
-        fd,
-        bufferinfo.m.offset);
+    void *buffer_start = mmap(NULL, bufferinfo.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bufferinfo.m.offset);
  
-    if(buffer_start == MAP_FAILED){
-        perror("mmap");
-        exit(-1);
+    if (buffer_start == MAP_FAILED){
+        perror("failed to mmap() buffer");
+        exit(EXIT_FAILURE);
     }
- 
-    memset(buffer_start, 0, bufferinfo.length);
-    printf("Arrive to the streaming\n");
 
     // Put the buffer in the incoming queue.
     if(ioctl(fd, VIDIOC_QBUF, &bufferinfo) < 0){
-        perror("VIDIOC_QBUF");
-        exit(-1);
+        perror("Failed to queue buffers");
+        exit(EXIT_FAILURE);
     }
     
-    // Activate streaming
-    int type = bufferinfo.type;
+    // Start streaming
+    unsigned type = bufferinfo.type;
+    
     if(ioctl(fd, VIDIOC_STREAMON, &type) < 0){
-        perror("VIDIOC_STREAMON");
+        perror("Failed to activate streaming");
         exit(EXIT_FAILURE);
     }
  
-    printf("buffer on the queue\n");
+    printf("Streaming.\n");
+   
+    // The buffer's waiting in the outgoing queue. This block will not trigger an error but
+    // will make the program hang
+    /* if(ioctl(fd, VIDIOC_DQBUF, &bufferinfo) < 0){ */
+    /*     perror("Failed to dequeue buffer"); */
+    /*     exit(EXIT_FAILURE); */
+    /* } */
 
-    // The buffer's waiting in the outgoing queue. This block will not through an error but will make the program hang
-    if(ioctl(fd, VIDIOC_DQBUF, &bufferinfo) < 0){
-        perror("VIDIOC_QBUF");
-        exit(EXIT_FAILURE);
-    }
+    //printf("Dequeued.\n");
+
+    //Saving raw image to file
+    int picture = open("picture.raw", O_RDWR | O_CREAT, 0666);
+    fprintf(stderr, "picture == %i\n", picture);
+    write(picture, buffer_start, bufferinfo.length);
     
-    // Your loops end here
- 
-    // Deactivate streaming
+    // Stop streaming
     if(ioctl(fd, VIDIOC_STREAMOFF, &type) < 0){
-        perror("VIDIOC_STREAMOFF");
+        perror("Failed to stop streaming");
         exit(EXIT_FAILURE);
         }
+    
     printf("before close()\n");
+    close(picture);
     close(fd);
     return EXIT_SUCCESS;
 }
