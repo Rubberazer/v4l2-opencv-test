@@ -1,7 +1,11 @@
 /*
- *Testing the V4l2 API on a jetson nano
- *Compile with: gcc -Wall -Werror -o v4l2_test1 v4l2_test1.c -lrt
- *Execute with: sudo ./v4l2_test1
+ * Testing the V4l2 API on a jetson nano
+ * To get information: v4l2-ctl -d /dev/video0 --info
+ * To know which formats are available isue command:  v4l2-ctl -d /dev/video0 --list-formats-ext
+ * To get current format: v4l2-ctl -d /dev/video0 --get-fmt-video
+ * Camera model: imx219 7-0010
+ * Compile with: gcc -Wall -Werror -o v4l2_test1 v4l2_test1.c -lrt
+ * Execute with: sudo ./v4l2_test1
 */
 
 #include <stdio.h>
@@ -18,6 +22,7 @@
 int main(void){
     
     int fd;
+    int nbufs = 10;
     
     if((fd = open("/dev/video0", O_RDWR)) < 0){
         perror("failed to open");
@@ -64,63 +69,96 @@ int main(void){
     
     //Buffer request
     struct v4l2_requestbuffers bufrequest = {0};
+
     bufrequest.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     bufrequest.memory = V4L2_MEMORY_MMAP;
-    bufrequest.count = 1;
+    bufrequest.count = nbufs;
  
     if(ioctl(fd, VIDIOC_REQBUFS, &bufrequest) < 0){
         perror("Failed buffer request");
         exit(EXIT_FAILURE);
     }
-    
-    //Query buffers
-    struct v4l2_buffer bufferinfo = {0};
- 
-    bufferinfo.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    bufferinfo.memory = V4L2_MEMORY_MMAP;
-    bufferinfo.index = 0;
- 
-    if (ioctl(fd, VIDIOC_QUERYBUF, &bufferinfo) < 0){
-        perror("Failed to query buffers");
-        exit(EXIT_FAILURE);
-    }
-    
-    void *buffer_start = mmap(NULL, bufferinfo.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bufferinfo.m.offset);
- 
-    if (buffer_start == MAP_FAILED){
-        perror("failed to mmap() buffer");
-        exit(EXIT_FAILURE);
-    }
 
-    // Put the buffer in the incoming queue.
-    if(ioctl(fd, VIDIOC_QBUF, &bufferinfo) < 0){
-        perror("Failed to queue buffers");
-        exit(EXIT_FAILURE);
+    //Query buffers
+    struct {
+        void *start;
+        size_t length;
+    } *buffers;
+    unsigned int i;
+
+    buffers = calloc(bufrequest.count, sizeof(*buffers));
+
+    for (i = 0; i < bufrequest.count; i++) {
+        struct v4l2_buffer bufferinfo = {0};
+        bufferinfo.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        bufferinfo.memory = V4L2_MEMORY_MMAP;
+        bufferinfo.index = i;
+        
+        struct v4l2_buffer bufferq = {0};
+        bufferq.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        bufferq.memory = V4L2_MEMORY_MMAP;
+        bufferq.index = i;
+ 
+        if (ioctl(fd, VIDIOC_QUERYBUF, &bufferinfo) < 0){
+            perror("Failed to query buffers");
+            exit(EXIT_FAILURE);
+        }
+
+        buffers[i].length = bufferinfo.length;
+        buffers[i].start = mmap(NULL, bufferinfo.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bufferinfo.m.offset);
+        
+ 
+        if (buffers[i].start == MAP_FAILED){
+            perror("failed to mmap() buffer");
+            exit(EXIT_FAILURE);
+        }
+
+        // Put the buffer in the incoming queue
+        
+        if (ioctl(fd, VIDIOC_QBUF, &bufferq) < 0){
+            perror("Failed to queue buffers");
+            exit(EXIT_FAILURE);
+        }
     }
     
     // Start streaming
-    unsigned type = bufferinfo.type;
+    unsigned type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     
     if(ioctl(fd, VIDIOC_STREAMON, &type) < 0){
         perror("Failed to activate streaming");
         exit(EXIT_FAILURE);
     }
- 
-    printf("Streaming.\n");
-   
-    // The buffer's waiting in the outgoing queue. This block will not trigger an error but
-    // will make the program hang
-    /* if(ioctl(fd, VIDIOC_DQBUF, &bufferinfo) < 0){ */
-    /*     perror("Failed to dequeue buffer"); */
-    /*     exit(EXIT_FAILURE); */
-    /* } */
 
-    //printf("Dequeued.\n");
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(fd, &fds);
+    struct timeval tv = {0};
+    tv.tv_sec = 2;
+    int r = select(fd+1, &fds, NULL, NULL, &tv);
+    if (-1 == r){
+        perror("Waiting for Frame");
+        exit(1);
+    }
+
+    printf("Streaming and waiting for frame.\n");
+    
+    // The buffer's waiting in the outgoing queue.
+     struct v4l2_buffer bufferdq = {0};
+        bufferdq.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        bufferdq.memory = V4L2_MEMORY_MMAP;
+        bufferdq.index = 0;
+    
+    if (ioctl(fd, VIDIOC_DQBUF, &bufferdq) < 0){
+        perror("Failed to dequeue buffer");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("Dequeued.\n");
 
     //Saving raw image to file
     int picture = open("picture.raw", O_RDWR | O_CREAT, 0666);
     fprintf(stderr, "picture == %i\n", picture);
-    write(picture, buffer_start, bufferinfo.length);
+    write(picture, buffers[bufferdq.index].start, buffers[bufferdq.index].length);
     
     // Stop streaming
     if(ioctl(fd, VIDIOC_STREAMOFF, &type) < 0){
@@ -128,8 +166,11 @@ int main(void){
         exit(EXIT_FAILURE);
         }
     
-    printf("before close()\n");
-    close(picture);
+    // Closing
+    close(picture); 
     close(fd);
+    for (i = 0; i < bufrequest.count; i++){
+        munmap(buffers[i].start, buffers[i].length);
+    }
     return EXIT_SUCCESS;
 }
