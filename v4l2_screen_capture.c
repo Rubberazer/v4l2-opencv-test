@@ -3,8 +3,9 @@
  * To get information: v4l2-ctl -d /dev/video0 --info
  * To know which formats are available isue command:  v4l2-ctl -d /dev/video0 --list-formats-ext
  * To get current format: v4l2-ctl -d /dev/video0 --get-fmt-video
+ * To change the format: v4l2-ctl -d /dev/video0 --set-fmt-video=width=1280,height=720,pixelformat=RG10 --verbose --set-ctrl=sensor_mode=4
  * Camera model: imx219 7-0010
- * Compile with: gcc -Wall -Werror -o v4l2_test1 v4l2_test1.c -lrt
+ * Compile with: gcc -Wall -Werror -o v4l2_screen_capture v4l2_screen_capture.c -lrt
  * Execute with: sudo ./v4l2_test1
 */
 
@@ -58,8 +59,8 @@ int main(void){
     struct v4l2_format format = {0};
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     format.fmt.pix.pixelformat = V4L2_PIX_FMT_SRGGB10; //V4L2_PIX_FMT_MJPEG;
-    format.fmt.pix.width = 3264;
-    format.fmt.pix.height = 2464;
+    format.fmt.pix.width = 3264; // NOT WORKING unless set up at default TRY this: struct v4l2_control ctrls;  ctrls.ctrl_class = V4L2_CTRL_ID2CLASS(id); ctrls.count = 1; ioctl(fd, VIDIOC_S_EXT_CTRLS, &ctrls); ctrls.ctrl_class = V4L2_CTRL_ID2CLASS(id); 
+    format.fmt.pix.height = 2464; //NOT WORKING unless set up at default
     format.fmt.pix.field = V4L2_FIELD_NONE;
     
     if (ioctl(fd, VIDIOC_S_FMT, &format) < 0){
