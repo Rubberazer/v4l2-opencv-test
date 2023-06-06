@@ -22,7 +22,7 @@
 int main(void){
     
     int fd;
-    int nbufs = 10;
+    int nbufs = 50;
     
     if((fd = open("/dev/video0", O_RDWR)) < 0){
         perror("failed to open");
@@ -58,8 +58,8 @@ int main(void){
     struct v4l2_format format = {0};
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     format.fmt.pix.pixelformat = V4L2_PIX_FMT_SRGGB10; //V4L2_PIX_FMT_MJPEG;
-    format.fmt.pix.width = 1280;
-    format.fmt.pix.height = 720;
+    format.fmt.pix.width = 3264;
+    format.fmt.pix.height = 2464;
     format.fmt.pix.field = V4L2_FIELD_NONE;
     
     if (ioctl(fd, VIDIOC_S_FMT, &format) < 0){
@@ -158,7 +158,7 @@ int main(void){
     //Saving raw image to file
     int picture = open("picture.raw", O_RDWR | O_CREAT, 0666);
     fprintf(stderr, "picture == %i\n", picture);
-    write(picture, buffers[bufferdq.index].start, buffers[bufferdq.index].length);
+    write(picture, buffers[bufferdq.index].start, bufferdq.bytesused);
     
     // Stop streaming
     if(ioctl(fd, VIDIOC_STREAMOFF, &type) < 0){
