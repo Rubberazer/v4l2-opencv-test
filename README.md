@@ -6,4 +6,5 @@ This is about trying to get frames from a CSI camera plugged into a Nano and the
 Reason to  do this is to find alternatives to gstreamer and libargus, let's see where this goes.
 
  -1 First screen capture: v4l2_screen_capture.c  DONE
+ 
  -2 Convert raw pic to jpeg or something (debayer and compress): NOT DONE
