@@ -173,5 +173,7 @@ int main(void){
     for (i = 0; i < bufrequest.count; i++){
         munmap(buffers[i].start, buffers[i].length);
     }
+    free(buffers);
+    
     return EXIT_SUCCESS;
 }
