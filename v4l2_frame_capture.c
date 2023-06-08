@@ -18,12 +18,13 @@
 #include <sys/ioctl.h>
 #include <sys/fcntl.h>
 #include <sys/mman.h>
-#include <linux/videodev2.h> 
+#include <linux/videodev2.h>
+#include <linux/tegra-v4l2-camera.h> //To be able to manipulate picture width & height
 
 int main(void){
     
     int fd;
-    int nbufs = 50;
+    int nbufs = 20;
     
     if((fd = open("/dev/video0", O_RDWR)) < 0){
         perror("failed to open");
@@ -55,12 +56,29 @@ int main(void){
     
     //To know which formats are available isue command:  v4l2-ctl -d /dev/video0 --list-formats-ext
     //Set out video formats
-
+    
     struct v4l2_format format = {0};
+    
+    int id = TEGRA_CAMERA_CID_SENSOR_MODE_ID; //Magic number that allows us to manipulate the format
+    struct v4l2_ext_controls controls = {0};
+    struct v4l2_ext_control control = {0};
+    
+    control.id = id;
+    control.value = 4;
+    controls.ctrl_class = V4L2_CTRL_ID2CLASS(id);
+    controls.count = 1;
+    controls.controls = &control;
+   
+    
+    if (ioctl(fd, VIDIOC_S_EXT_CTRLS, &controls) < 0){
+        perror("Could not setup camera controls");
+        exit(EXIT_FAILURE);
+    }
+    
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     format.fmt.pix.pixelformat = V4L2_PIX_FMT_SRGGB10; //V4L2_PIX_FMT_MJPEG;
-    format.fmt.pix.width = 3264; // NOT WORKING unless set up at default TRY this: struct v4l2_control ctrls;  ctrls.ctrl_class = V4L2_CTRL_ID2CLASS(id); ctrls.count = 1; ioctl(fd, VIDIOC_S_EXT_CTRLS, &ctrls); ctrls.ctrl_class = V4L2_CTRL_ID2CLASS(id); 
-    format.fmt.pix.height = 2464; //NOT WORKING unless set up at default
+    format.fmt.pix.width = 1280; // NOT WORKING unless set up at default 
+    format.fmt.pix.height = 720; //NOT WORKING unless set up at default
     format.fmt.pix.field = V4L2_FIELD_NONE;
     
     if (ioctl(fd, VIDIOC_S_FMT, &format) < 0){
