@@ -49,7 +49,7 @@ cout << "Upload to GPU complete" << endl;
 // Debayer here
 //cv::cuda::demosaicing(src, dst, cv::cuda::COLOR_BayerRG2RGB_MHT);
 cv::cuda::cvtColor(src, dst, cv::COLOR_BayerRGGB2RGB);
-
+cv::cuda::gammaCorrection(dst, dst, false);
 // done
 cout << "Demosaicing complete" << endl;
 
