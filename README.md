@@ -12,6 +12,6 @@ Camera: imx219
 STEPS
 
 
- -1 First camera frame capture: v4l2_frame_capture.c  DONE, not OpenCV yet
+ 	1 First camera frame capture: v4l2_frame_capture.c  DONE, not OpenCV yet
  
- -2 Convert raw pic to jpeg or something (debayer and compress): NOT DONE
+	2 Convert raw pic to RGB or something (debayer): opencv_frame_demosaicing.cpp DONE
