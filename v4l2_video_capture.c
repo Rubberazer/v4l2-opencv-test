@@ -69,6 +69,7 @@ int main(void){
     controls.count = 1;
     controls.controls = &control;
    
+    
     if (ioctl(fd, VIDIOC_S_EXT_CTRLS, &controls) < 0){
         perror("Could not setup camera controls");
         exit(EXIT_FAILURE);
@@ -76,8 +77,8 @@ int main(void){
     
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     format.fmt.pix.pixelformat = V4L2_PIX_FMT_SRGGB10; //V4L2_PIX_FMT_MJPEG;
-    format.fmt.pix.width = 1280;  
-    format.fmt.pix.height = 720; 
+    format.fmt.pix.width = 1280; // NOT WORKING unless set up at default 
+    format.fmt.pix.height = 720; //NOT WORKING unless set up at default
     format.fmt.pix.field = V4L2_FIELD_NONE;
     
     if (ioctl(fd, VIDIOC_S_FMT, &format) < 0){

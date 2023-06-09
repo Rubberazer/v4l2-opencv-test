@@ -33,7 +33,7 @@ char* buffer = new char[size];
 ifs.read (buffer,size);
 ifs.close();
 
-cv::Mat src_host(2464, 3264, CV_16UC1, buffer);
+cv::Mat src_host(2464, 3264, CV_16UC1, buffer);  //(720, 1280, CV_16UC1, buffer);
 src_host.convertTo(src_host, CV_8U);
 
 cout << "buffer to src_host" << endl;
@@ -49,7 +49,7 @@ cout << "Upload to GPU complete" << endl;
 // Debayer here
 //cv::cuda::demosaicing(src, dst, cv::cuda::COLOR_BayerRG2RGB_MHT);
 cv::cuda::cvtColor(src, dst, cv::COLOR_BayerRGGB2RGB);
-cv::cuda::gammaCorrection(dst, dst, false);
+//cv::cuda::gammaCorrection(dst, dst, false);
 // done
 cout << "Demosaicing complete" << endl;
 
