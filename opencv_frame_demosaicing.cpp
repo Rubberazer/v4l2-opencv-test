@@ -33,7 +33,7 @@ char* buffer = new char[size];
 ifs.read (buffer,size);
 ifs.close();
 
-cv::Mat src_host(2464, 3264, CV_16UC1, buffer);  //(720, 1280, CV_16UC1, buffer);
+cv::Mat src_host(720, 1280, CV_16UC1, buffer);  //(2464, 3264, CV_16UC1, buffer);
 src_host.convertTo(src_host, CV_8U);
 
 cout << "buffer to src_host" << endl;
@@ -58,7 +58,7 @@ cv::Mat result;
 dst.download(result);
 
 cv::namedWindow("Debayered Image", cv::WINDOW_KEEPRATIO);
-cv::resizeWindow("Debayered Image", 3264/2, 2464/2);
+cv::resizeWindow("Debayered Image", 1280/2, 720/2);
 cv::imshow("Debayered Image", result);
 cv::waitKey(0);
 
