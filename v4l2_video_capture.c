@@ -1,12 +1,7 @@
 /*
  * Testing the V4l2 API on a jetson nano
- * To get information: v4l2-ctl -d /dev/video0 --info
- * To know which formats are available isue command:  v4l2-ctl -d /dev/video0 --list-formats-ext
- * To get current format: v4l2-ctl -d /dev/video0 --get-fmt-video
- * To change the format: v4l2-ctl -d /dev/video0 --set-fmt-video=width=1280,height=720,pixelformat=RG10 --verbose --set-ctrl=sensor_mode=4
- * Camera model: imx219 7-0010
- * Compile with: gcc -Wall -Werror -o v4l2_frame_capture v4l2_frame_capture.c -lrt
- * Execute with: sudo ./v4l2_test1
+ * video capture
+ * gcc -o v4l_video_capture.o v4l_video_capture.c  -I./ -lrt
 */
 
 #include <stdio.h>
@@ -21,19 +16,33 @@
 #include <linux/videodev2.h>
 #include <linux/tegra-v4l2-camera.h> //To be able to manipulate picture width & height
 
-int main(void){
-    
+#include "video_capture.h"
+
+//Globals
+static volatile unsigned global_int;
+static pthread_t callThd[1];
+static pthread_attr_t attr;
+static int pth_err;
+static void *status_thread;
+static int thread_n = 0;
+struct {
+    void *start;
+    size_t length;
+} *buffers;
+
+int camera_init(const char *camera, unsigned width, unsigned height, unsigned nbufs, char *frame){    
     int fd;
-    int nbufs = 20;
+    // int nbufs = 20;
+    // char *camera = "/dev/video0";
     
-    if((fd = open("/dev/video0", O_RDWR)) < 0){
+    if((fd = open(*camera, O_RDWR)) < 0){
         perror("failed to open");
         exit(EXIT_FAILURE);
     }
 
     //Query device capabilities
-
     struct v4l2_capability cap;
+    
     if (ioctl(fd, VIDIOC_QUERYCAP, &cap) < 0){
         perror("Failed to query capabilities");
         exit(EXIT_FAILURE);
@@ -44,31 +53,22 @@ int main(void){
         exit(EXIT_FAILURE);
     }
 
-    /* if (!(cap.capabilities & V4L2_CAP_READWRITE)){ */
-    /*     fprintf(stderr, "The device does not support read/write.\n"); */
-    /*     exit(EXIT_FAILURE); */
-    /* } */
-
     if (!(cap.capabilities & V4L2_CAP_STREAMING)){
         fprintf(stderr, "The device does not support streaming.\n");
         exit(EXIT_FAILURE);
     }
-    
-    //To know which formats are available isue command:  v4l2-ctl -d /dev/video0 --list-formats-ext
-    //Set out video formats
-    
+
+    //Setup format, size, width, height
     struct v4l2_format format = {0};
-    
-    int id = TEGRA_CAMERA_CID_SENSOR_MODE_ID; //Magic number that allows us to manipulate the format
     struct v4l2_ext_controls controls = {0};
     struct v4l2_ext_control control = {0};
+    int id = TEGRA_CAMERA_CID_SENSOR_MODE_ID; //Magic number that allows us to manipulate the format
     
     control.id = id;
     control.value = 4;
     controls.ctrl_class = V4L2_CTRL_ID2CLASS(id);
     controls.count = 1;
     controls.controls = &control;
-   
     
     if (ioctl(fd, VIDIOC_S_EXT_CTRLS, &controls) < 0){
         perror("Could not setup camera controls");
@@ -77,8 +77,8 @@ int main(void){
     
     format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     format.fmt.pix.pixelformat = V4L2_PIX_FMT_SRGGB10; //V4L2_PIX_FMT_MJPEG;
-    format.fmt.pix.width = 1280; // NOT WORKING unless set up at default 
-    format.fmt.pix.height = 720; //NOT WORKING unless set up at default
+    format.fmt.pix.width = width; 
+    format.fmt.pix.height = height;
     format.fmt.pix.field = V4L2_FIELD_NONE;
     
     if (ioctl(fd, VIDIOC_S_FMT, &format) < 0){
@@ -99,15 +99,12 @@ int main(void){
     }
 
     //Query buffers
-    struct {
-        void *start;
-        size_t length;
-    } *buffers;
     unsigned int i;
 
     buffers = calloc(bufrequest.count, sizeof(*buffers));
 
     for (i = 0; i < bufrequest.count; i++) {
+        a
         struct v4l2_buffer bufferinfo = {0};
         bufferinfo.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         bufferinfo.memory = V4L2_MEMORY_MMAP;
@@ -124,8 +121,8 @@ int main(void){
         }
 
         buffers[i].length = bufferinfo.length;
-        buffers[i].start = mmap(NULL, bufferinfo.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bufferinfo.m.offset);
-        
+        buffers[i].start = mmap(NULL, bufferinfo.length, PROT_READ | PROT_WRITE, MAP_SHARED,
+                                fd, bufferinfo.m.offset);
  
         if (buffers[i].start == MAP_FAILED){
             perror("failed to mmap() buffer");
@@ -139,6 +136,14 @@ int main(void){
             exit(EXIT_FAILURE);
         }
     }
+    return 1;
+}
+
+void *callback(void *arg){
+
+}
+
+void *camera_stream_on(const char *camera, char * frame){
     
     // Start streaming
     unsigned type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -174,24 +179,46 @@ int main(void){
 
     printf("Dequeued.\n");
 
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    pth_err = pthread_create(&callThd[thread_n], &attr, callback, (void *)ISRFunc_CFG[gpio]); 
+        if (pth_err !=0){
+            perror("Thread not created, exiting the function  with error: %d\n", pth_err);
+            exit(EXIT_FAILURE);
+        }
+
     //Saving raw image to file
     int picture = open("picture.raw", O_RDWR | O_CREAT, 0666);
     fprintf(stderr, "picture == %i\n", picture);
     write(picture, buffers[bufferdq.index].start, bufferdq.bytesused);
-    
+
+}
+
+int camera_stream_off(const *char camera, unsigned nbufs){
     // Stop streaming
-    if(ioctl(fd, VIDIOC_STREAMOFF, &type) < 0){
+    if(ioctl(camera, VIDIOC_STREAMOFF, &type) < 0){
         perror("Failed to stop streaming");
         exit(EXIT_FAILURE);
         }
     
-    // Closing
-    close(picture); 
-    close(fd);
-    for (i = 0; i < bufrequest.count; i++){
+    // Closing 
+    close(camera);
+    
+    for(int i = 0;i < thread_n; i++) {
+        pthread_cancel(callThd[i]);
+      //printf("Thread number: %d cancelled\n",i);
+    }
+    
+    //Joining threads
+     for(int j = 0;j < thread_n; j++) {
+         pthread_join(callThd[j], &status_thread);
+      //printf("Thread number: %d joined\n",j);
+    }
+    
+    for (i = 0; i < nbuf; i++){
         munmap(buffers[i].start, buffers[i].length);
     }
     free(buffers);
     
-    return EXIT_SUCCESS;
+    return 1;
 }
