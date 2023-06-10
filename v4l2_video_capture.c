@@ -29,6 +29,12 @@ struct {
     void *start;
     size_t length;
 } *buffers;
+struct{
+    int nbuf;
+    const char *camera;
+    
+} parameters;
+
 
 int camera_init(const char *camera, unsigned width, unsigned height, unsigned nbufs, char *frame){    
     int fd;
@@ -181,9 +187,9 @@ void *camera_stream_on(const char *camera, char * frame){
 
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pth_err = pthread_create(&callThd[thread_n], &attr, callback, (void *)ISRFunc_CFG[gpio]); 
+    pth_err = pthread_create(&callThd[thread_n], &attr, callback, (void *)parameters); 
         if (pth_err !=0){
-            perror("Thread not created, exiting the function  with error: %d\n", pth_err);
+            perror("Thread not created, exiting the function  with error: ");
             exit(EXIT_FAILURE);
         }
 
