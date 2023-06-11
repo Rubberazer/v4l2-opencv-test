@@ -265,6 +265,7 @@ int camera_stream_off(int fd, unsigned nbufs){
         munmap(buffers[k].start, buffers[k].length);
     }
     free(buffers);
+    free(parameters);
     
     return 0;
 }
