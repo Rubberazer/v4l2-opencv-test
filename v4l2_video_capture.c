@@ -15,6 +15,7 @@
 #include <sys/mman.h>
 #include <linux/videodev2.h>
 #include <linux/tegra-v4l2-camera.h> //To be able to manipulate picture width & height
+#include <pthread.h>
 
 #include "video_capture.h"
 
@@ -29,10 +30,11 @@ struct {
     void *start;
     size_t length;
 } *buffers;
-struct{
-    int nbuf;
+struct {
+    unsigned nbuf;
+    unsigned index;
     const char *camera;
-    
+    void *buffer;
 } parameters;
 
 
@@ -104,10 +106,10 @@ int camera_init(const char *camera, unsigned width, unsigned height, unsigned nb
         exit(EXIT_FAILURE);
     }
 
+    buffers = calloc(bufrequest.count, sizeof(*buffers));
+    
     //Query buffers
     unsigned int i;
-
-    buffers = calloc(bufrequest.count, sizeof(*buffers));
 
     for (i = 0; i < bufrequest.count; i++) {
         a
