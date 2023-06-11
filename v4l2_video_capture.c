@@ -146,7 +146,7 @@ int camera_init(const char *camera, unsigned width, unsigned height, unsigned nb
     
     parameters->nbufs = nbufs;
     parameters->index = bufferq.index;
-    
+    parameters->fd = fd;
     return fd;
 }
 
@@ -228,7 +228,6 @@ int camera_stream_on(int fd, void *frame){
     }
 
     parameters->buffer = frame;
-    parameters->fd = fd;
 
     //Saving raw image to file
     /* int picture = open("picture.raw", O_RDWR | O_CREAT, 0666); */
