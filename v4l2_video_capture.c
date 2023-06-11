@@ -21,7 +21,7 @@
 
 //Globals
 static volatile unsigned global_int;
-static pthread_t callThd[1];
+static pthread_t callThd[1]; // number of threads, only one is needed for capturing
 static pthread_attr_t attr;
 static int pth_err;
 static void *status_thread;
@@ -33,12 +33,11 @@ struct {
 struct {
     unsigned nbuf;
     unsigned index;
-    const char *camera;
     void *buffer;
 } parameters;
 
 
-int camera_init(const char *camera, unsigned width, unsigned height, unsigned nbufs, char *frame){    
+int camera_init(const char *camera, unsigned width, unsigned height, unsigned nbufs){    
     int fd;
     // int nbufs = 20;
     // char *camera = "/dev/video0";
@@ -96,7 +95,6 @@ int camera_init(const char *camera, unsigned width, unsigned height, unsigned nb
     
     //Buffer request
     struct v4l2_requestbuffers bufrequest = {0};
-
     bufrequest.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     bufrequest.memory = V4L2_MEMORY_MMAP;
     bufrequest.count = nbufs;
@@ -105,23 +103,17 @@ int camera_init(const char *camera, unsigned width, unsigned height, unsigned nb
         perror("Failed buffer request");
         exit(EXIT_FAILURE);
     }
-
     buffers = calloc(bufrequest.count, sizeof(*buffers));
     
     //Query buffers
     unsigned int i;
 
     for (i = 0; i < bufrequest.count; i++) {
-        a
+ 
         struct v4l2_buffer bufferinfo = {0};
         bufferinfo.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         bufferinfo.memory = V4L2_MEMORY_MMAP;
         bufferinfo.index = i;
-        
-        struct v4l2_buffer bufferq = {0};
-        bufferq.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        bufferq.memory = V4L2_MEMORY_MMAP;
-        bufferq.index = i;
  
         if (ioctl(fd, VIDIOC_QUERYBUF, &bufferinfo) < 0){
             perror("Failed to query buffers");
@@ -136,22 +128,30 @@ int camera_init(const char *camera, unsigned width, unsigned height, unsigned nb
             perror("failed to mmap() buffer");
             exit(EXIT_FAILURE);
         }
-
-        // Put the buffer in the incoming queue
-        
-        if (ioctl(fd, VIDIOC_QBUF, &bufferq) < 0){
-            perror("Failed to queue buffers");
-            exit(EXIT_FAILURE);
-        }
     }
-    return 1;
+    
+    // Put the buffer in the incoming queue this is needed only for some cameras
+    struct v4l2_buffer bufferq = {0};
+    bufferq.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    bufferq.memory = V4L2_MEMORY_
+    bufferq.index = 0;
+
+    if (ioctl(fd, VIDIOC_QBUF, &bufferq) < 0){
+        perror("Failed to queue buffers");
+        exit(EXIT_FAILURE);
+    }
+    
+    parameters.nbuf = nbuf;
+    parameters.index = bufferq.index;
+    
+    return fd;
 }
 
 void *callback(void *arg){
 
 }
 
-void *camera_stream_on(const char *camera, char * frame){
+void *camera_stream_on(int fd, char * frame){
     
     // Start streaming
     unsigned type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -161,6 +161,8 @@ void *camera_stream_on(const char *camera, char * frame){
         exit(EXIT_FAILURE);
     }
 
+    printf("Streaming and waiting for frame.\n");
+    
     fd_set fds;
     FD_ZERO(&fds);
     FD_SET(fd, &fds);
@@ -171,46 +173,45 @@ void *camera_stream_on(const char *camera, char * frame){
         perror("Waiting for Frame");
         exit(1);
     }
-
-    printf("Streaming and waiting for frame.\n");
     
     // The buffer's waiting in the outgoing queue.
      struct v4l2_buffer bufferdq = {0};
-        bufferdq.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        bufferdq.memory = V4L2_MEMORY_MMAP;
-        bufferdq.index = 0;
+     bufferdq.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+     bufferdq.memory = V4L2_MEMORY_MMAP;
+     bufferdq.index = 0;
     
     if (ioctl(fd, VIDIOC_DQBUF, &bufferdq) < 0){
         perror("Failed to dequeue buffer");
         exit(EXIT_FAILURE);
     }
 
-    printf("Dequeued.\n");
+    printf("Dequeued first time. Creating thread\n");
 
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     pth_err = pthread_create(&callThd[thread_n], &attr, callback, (void *)parameters); 
-        if (pth_err !=0){
-            perror("Thread not created, exiting the function  with error: ");
-            exit(EXIT_FAILURE);
-        }
+    if (pth_err !=0){
+        perror("Thread not created, exiting the function  with error: ");
+        exit(EXIT_FAILURE);
+    }
 
     //Saving raw image to file
-    int picture = open("picture.raw", O_RDWR | O_CREAT, 0666);
-    fprintf(stderr, "picture == %i\n", picture);
-    write(picture, buffers[bufferdq.index].start, bufferdq.bytesused);
+    /* int picture = open("picture.raw", O_RDWR | O_CREAT, 0666); */
+    /* fprintf(stderr, "picture == %i\n", picture); */
+    /* write(picture, buffers[bufferdq.index].start, bufferdq.bytesused); */
 
+    return 0;
 }
 
-int camera_stream_off(const *char camera, unsigned nbufs){
+int camera_stream_off(int fd, unsigned nbufs){
     // Stop streaming
-    if(ioctl(camera, VIDIOC_STREAMOFF, &type) < 0){
+    if(ioctl(fd, VIDIOC_STREAMOFF, &type) < 0){
         perror("Failed to stop streaming");
         exit(EXIT_FAILURE);
-        }
+    }
     
     // Closing 
-    close(camera);
+    close(fd);
     
     for(int i = 0;i < thread_n; i++) {
         pthread_cancel(callThd[i]);

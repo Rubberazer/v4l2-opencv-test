@@ -13,14 +13,14 @@ extern "C" {
 #endif
 
 /* Functions */
-    /* Returning 1 when OK */
-    int camera_init(const char *camera, unsigned width, unsigned height, unsigned nbufs, char *frame);
+    /* Returning fd, it will exit otherwise  */
+    int camera_init(const char *camera, unsigned width, unsigned height, unsigned nbufs);
 
-    /* Returning 1 when OK */
-    int camera_stream_on(const char *camera, char * frame);
+    /* Returning 0 when OK, it will exit otherwise */
+    int camera_stream_on(int fd, char * frame);
     
-    /* Returning 1 when OK */
-    int camera_stream_off(const char *camera, unsigned nbufs);
+    /* Returning 0 when OK, it will exit otherwise */
+    int camera_stream_off(int fd, unsigned nbufs);
 
 #ifdef __cplusplus
 }
