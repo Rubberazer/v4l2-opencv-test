@@ -1,7 +1,7 @@
 /*
  * Testing the V4l2 API on a jetson nano
  * video capture
- * gcc -o v4l_video_capture.o v4l_video_capture.c  -I./ -lrt
+ * gcc -Wall -Werror -o v4l_video_capture.o v4l_video_capture.c  -I./ -lrt
 */
 
 #include <stdio.h>
@@ -25,24 +25,28 @@ static pthread_t callThd[1]; // number of threads, only one is needed for captur
 static pthread_attr_t attr;
 static int pth_err;
 static void *status_thread;
-static int thread_n = 0;
-struct {
+static int thread_n = 1;
+struct{
     void *start;
     size_t length;
-} *buffers;
-struct {
-    unsigned nbuf;
+} *buffers = {0};
+
+struct PARAM{
+    unsigned nbufs;
+    int fd;
     unsigned index;
     void *buffer;
-} parameters;
-
+};
+static struct PARAM *parameters; 
 
 int camera_init(const char *camera, unsigned width, unsigned height, unsigned nbufs){    
     int fd;
+    parameters = malloc(sizeof(struct PARAM));
+       
     // int nbufs = 20;
     // char *camera = "/dev/video0";
     
-    if((fd = open(*camera, O_RDWR)) < 0){
+    if((fd = open(camera, O_RDWR)) < 0){
         perror("failed to open");
         exit(EXIT_FAILURE);
     }
@@ -106,9 +110,8 @@ int camera_init(const char *camera, unsigned width, unsigned height, unsigned nb
     buffers = calloc(bufrequest.count, sizeof(*buffers));
     
     //Query buffers
-    unsigned int i;
 
-    for (i = 0; i < bufrequest.count; i++) {
+    for (int i = 0; i < bufrequest.count; i++) {
  
         struct v4l2_buffer bufferinfo = {0};
         bufferinfo.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -130,10 +133,10 @@ int camera_init(const char *camera, unsigned width, unsigned height, unsigned nb
         }
     }
     
-    // Put the buffer in the incoming queue this is needed only for some cameras
+    // Put the buffer in the incoming queue before streaming, this is needed only for some cameras
     struct v4l2_buffer bufferq = {0};
     bufferq.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    bufferq.memory = V4L2_MEMORY_
+    bufferq.memory = V4L2_MEMORY_MMAP;
     bufferq.index = 0;
 
     if (ioctl(fd, VIDIOC_QBUF, &bufferq) < 0){
@@ -141,17 +144,46 @@ int camera_init(const char *camera, unsigned width, unsigned height, unsigned nb
         exit(EXIT_FAILURE);
     }
     
-    parameters.nbuf = nbuf;
-    parameters.index = bufferq.index;
+    parameters->nbufs = nbufs;
+    parameters->index = bufferq.index;
     
     return fd;
 }
 
 void *callback(void *arg){
 
+    struct PARAM *int_parameters = (struct PARAM *)arg;
+
+    while(1){
+        for (int i = 0; i < int_parameters->nbufs; i++) {
+            
+            // Put the buffer in the incoming queue
+            struct v4l2_buffer bufferq = {0};
+            bufferq.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+            bufferq.memory = V4L2_MEMORY_MMAP;
+            bufferq.index = i;
+
+            if (ioctl(int_parameters->fd, VIDIOC_QBUF, &bufferq) < 0){
+                perror("Failed to queue buffers");
+                exit(EXIT_FAILURE);
+            }
+            
+           // The buffer's waiting in the outgoing queue.
+            struct v4l2_buffer bufferdq = {0};
+            bufferdq.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+            bufferdq.memory = V4L2_MEMORY_MMAP;
+            bufferdq.index = i;
+    
+            if (ioctl(int_parameters->fd, VIDIOC_DQBUF, &bufferdq) < 0){
+                perror("Failed to dequeue buffer");
+                exit(EXIT_FAILURE);
+            }
+            memcpy(parameters->buffer, buffers[bufferdq.index].start, buffers[bufferdq.index].length);
+        } 
+    }
 }
 
-void *camera_stream_on(int fd, char * frame){
+int camera_stream_on(int fd, void *frame){
     
     // Start streaming
     unsigned type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -195,6 +227,9 @@ void *camera_stream_on(int fd, char * frame){
         exit(EXIT_FAILURE);
     }
 
+    parameters->buffer = frame;
+    parameters->fd = fd;
+
     //Saving raw image to file
     /* int picture = open("picture.raw", O_RDWR | O_CREAT, 0666); */
     /* fprintf(stderr, "picture == %i\n", picture); */
@@ -204,7 +239,9 @@ void *camera_stream_on(int fd, char * frame){
 }
 
 int camera_stream_off(int fd, unsigned nbufs){
+
     // Stop streaming
+    unsigned type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if(ioctl(fd, VIDIOC_STREAMOFF, &type) < 0){
         perror("Failed to stop streaming");
         exit(EXIT_FAILURE);
@@ -224,10 +261,10 @@ int camera_stream_off(int fd, unsigned nbufs){
       //printf("Thread number: %d joined\n",j);
     }
     
-    for (i = 0; i < nbuf; i++){
-        munmap(buffers[i].start, buffers[i].length);
+    for (int k = 0; k < nbufs; k++){
+        munmap(buffers[k].start, buffers[k].length);
     }
     free(buffers);
     
-    return 1;
+    return 0;
 }

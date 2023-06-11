@@ -17,7 +17,7 @@ extern "C" {
     int camera_init(const char *camera, unsigned width, unsigned height, unsigned nbufs);
 
     /* Returning 0 when OK, it will exit otherwise */
-    int camera_stream_on(int fd, char * frame);
+    int camera_stream_on(int fd, void *frame);
     
     /* Returning 0 when OK, it will exit otherwise */
     int camera_stream_off(int fd, unsigned nbufs);
