@@ -16,4 +16,5 @@ STEPS
  
 	2 Convert raw pic to RGB or something (debayer): opencv_frame_demosaicing.cpp DONE
 
-	3 Create continuous stream: v4l2_video_capture.c NOT DONE
+	3 Create continuous stream: v4l2_video_capture.c DONE / opencv_video.cpp NOT DONE
+
