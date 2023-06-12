@@ -16,5 +16,7 @@ STEPS
  
 	2 Convert raw pic to RGB or something (debayer): opencv_frame_demosaicing.cpp DONE
 
-	3 Create continuous stream: v4l2_video_capture.c DONE / opencv_video.cpp NOT DONE
+	3 Create continuous stream: v4l2_video_capture.c, video_capture.h DONE / opencv_video.cpp DONE. Execute with ./video_capture ->This is a bad idea,
+	performance is rubbish!
+			
 
