@@ -1,5 +1,5 @@
 /*
- * To compile: g++ -Wall -Werror -o opencv_frame_demosaicing opencv_frame_demosaicing.cpp -I/usr/local/include/opencv -I/usr/include/opencv4/ -L/usr/lib/aarch64-linux-gnu/ -lrt -lopencv_videoio -lopencv_core -lopencv_imgproc -lopencv_ml -lopencv_video -lopencv_highgui -lopencv_imgcodecs -lopencv_img_hash -lopencv_cudaimgproc
+ * To compile: g++ -Wall -Werror -c -o opencv_video.o opencv_video.cpp 
 
  */
 
@@ -11,57 +11,49 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/core/cuda.hpp>
+#include "video_capture.h"
+#include <unistd.h>
 
 #include <iostream>
 #include <fstream>
 
-
 using namespace std;
 
-int main(int argc, char* argv[])
-{
-ifstream ifs("picture.raw", std::ifstream::binary);
+int main(int argc, char* argv[]){
 
-ifs.seekg (0, ifs.end);
-int size = ifs.tellg();
-ifs.seekg (0, ifs.beg);
+    unsigned size = 0;
+    unsigned nbufs = 20;
+    char const *camera = "/dev/video0";
 
-cout << size << endl;
-cout << "Reading image into buffer..." << endl;
+    int fd = camera_init(camera, 1280, 720, nbufs, &size);
 
-char* buffer = new char[size];
-ifs.read (buffer,size);
-ifs.close();
+    char *frame = new char[size];
+    camera_stream_on(fd, frame);
 
-cv::Mat src_host(720, 1280, CV_16UC1, buffer);  //(2464, 3264, CV_16UC1, buffer);
-src_host.convertTo(src_host, CV_8U);
+    sleep(2);
 
-cout << "buffer to src_host" << endl;
-//cv::Mat dst;
-//cv::cvtColor(src_host, dst, cv::COLOR_BayerRG2RGB);
+    while(1){
+    
+        cv::Mat src_host(720, 1280, CV_16UC1, frame);  //(2464, 3264, CV_16UC1, buffer);
+        src_host.convertTo(src_host, CV_8U);
 
-cv::cuda::GpuMat src, dst;
-src.upload(src_host);
+        cv::cuda::GpuMat src, dst;
+        src.upload(src_host);
 
-// uploaded
-cout << "Upload to GPU complete" << endl;
+        // Debayer here
+        cv::cuda::cvtColor(src, dst, cv::COLOR_BayerRGGB2RGB);
+        cv::cuda::gammaCorrection(dst, dst, true);
 
-// Debayer here
-//cv::cuda::demosaicing(src, dst, cv::cuda::COLOR_BayerRG2RGB_MHT);
-cv::cuda::cvtColor(src, dst, cv::COLOR_BayerRGGB2RGB);
-//cv::cuda::gammaCorrection(dst, dst, false);
-// done
-cout << "Demosaicing complete" << endl;
-
-// have a look
-cv::Mat result;
-dst.download(result);
-
-cv::namedWindow("Debayered Image", cv::WINDOW_KEEPRATIO);
-cv::resizeWindow("Debayered Image", 1280/2, 720/2);
-cv::imshow("Debayered Image", result);
-cv::waitKey(0);
-
-delete[] buffer;
-return 0;
+        // have a look
+        cv::Mat result;
+        dst.download(result);
+        cv::imshow("Debayered Image", result);
+    
+        if ((char)27 == cv::waitKey(1)){
+            break;
+        }
+    }
+    camera_stream_off(fd, nbufs);
+    delete[] frame;
+    return 0;
 }
