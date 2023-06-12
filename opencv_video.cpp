@@ -2,7 +2,6 @@
  * To compile: g++ -Wall -Werror -c -o opencv_video.o opencv_video.cpp 
 
  */
-
 #include <opencv2/core.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/hal/interface.h>
@@ -12,7 +11,6 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/core/cuda.hpp>
 #include "video_capture.h"
-#include <unistd.h>
 
 #include <iostream>
 #include <fstream>
@@ -29,8 +27,6 @@ int main(int argc, char* argv[]){
 
     char *frame = new char[size];
     camera_stream_on(fd, frame);
-
-    sleep(2);
 
     while(1){
     
