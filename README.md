@@ -19,7 +19,7 @@ STEPS
 	3 Create continuous stream: v4l2_video_capture.c, video_capture.h DONE / opencv_video.cpp DONE. 
 	Execute with ./video_capture
 
-CONCLUSION: getting frames on a thread and then demosaicing/debayering with opencv (uploading to GPU with CUDA) in another gave a rubbish performace, not worthy.
+CONCLUSION: getting frames on a thread and then demosaicing/debayering with opencv (uploading to GPU with CUDA) in another gave a rubbish performance, not worthy.
 	Maybe it is actually better without imshow() and streaming somehow would be better? Anyways, the only thing 
 	could be to find out if the driver supports DMA, that would be a puncher 
 			
