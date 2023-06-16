@@ -20,6 +20,6 @@ STEPS
 	Execute with ./video_capture
 
 CONCLUSION: getting frames on a thread and then demosaicing/debayering with opencv (uploading to GPU with CUDA) in another, basically works. At the beginning thought
-performance was rubbish but basically the problem was imshow() being slow over the network. So yeah, it does work but it is not an improvement over GSTreamer of libargus
+performance was rubbish but basically the problem was imshow() being slow over the network. So yeah, it does work but it is not an improvement over GSTreamer or libargus
 			
 
