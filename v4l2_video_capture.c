@@ -14,10 +14,14 @@
 #include <sys/fcntl.h>
 #include <sys/mman.h>
 #include <linux/videodev2.h>
+#include <linux/v4l2-controls.h>
 #include <linux/tegra-v4l2-camera.h> //To be able to manipulate picture width & height
 #include <pthread.h>
+#include <time.h>
 
 #include "video_capture.h"
+
+#define BILLION 1000000000L 
 
 //Globals
 static volatile unsigned global_int;
@@ -40,6 +44,8 @@ struct PARAM{
 static struct PARAM *parameters;
 static volatile unsigned interrupt = 1;
 
+static uint64_t diff;
+static struct timespec start, end;
 
 int camera_init(const char *camera, unsigned width, unsigned height, unsigned nbufs, unsigned *size){    
     int fd;
@@ -98,6 +104,19 @@ int camera_init(const char *camera, unsigned width, unsigned height, unsigned nb
         perror("Could not set video format");
         exit(EXIT_FAILURE);
     }
+
+    //Set up framerate
+    /* struct v4l2_streamparm streamparam = {0}; */
+    /* streamparam.type = V4L2_BUF_TYPE_VIDEO_CAPTURE; */
+    /* streamparam.parm.capture.capability = V4L2_CAP_TIMEPERFRAME; */
+    /* streamparam.parm.capture.capturemode = V4L2_CAP_TIMEPERFRAME; */
+    /* streamparam.parm.capture.timeperframe.numerator = 1; */
+    /* streamparam.parm.capture.timeperframe.denominator = 60; */
+    
+    /* if (ioctl(fd, VIDIOC_S_PARM, &streamparam) <0) { */
+    /*     perror("Could not set framerate"); */
+    /*     exit(EXIT_FAILURE); */
+    /* } */
     
     //Buffer request
     struct v4l2_requestbuffers bufrequest = {0};
@@ -157,7 +176,9 @@ void *callback(void *arg){
 
     struct PARAM *int_parameters = (struct PARAM *)arg;
     //int count = 0;
+   
     while(interrupt){
+        clock_gettime(CLOCK_MONOTONIC, &start);
         for (int i = 0; i < int_parameters->nbufs; i++) {
       
             // Put the buffer in the incoming queue
@@ -183,7 +204,10 @@ void *callback(void *arg){
             memcpy(parameters->buffer, buffers[bufferdq.index].start, buffers[bufferdq.index].length);
             /* count++; */
             /* printf("counting:%d\n", count); */
-        } 
+        }
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        diff = BILLION * (end.tv_sec - start.tv_sec) + end.tv_nsec - start.tv_nsec;
+        printf("elapsed time = %llu nanoseconds\n", (long long unsigned int) diff);
     }
     pthread_exit(NULL);
 }
