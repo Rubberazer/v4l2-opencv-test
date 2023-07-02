@@ -20,7 +20,7 @@ using namespace std;
 int main(int argc, char* argv[]){
 
     unsigned size = 0;
-    unsigned nbufs = 5;
+    unsigned nbufs = 3;
     char const *camera = "/dev/video0";
 
     int fd = camera_init(camera, 1280, 720, nbufs, &size);
@@ -29,28 +29,28 @@ int main(int argc, char* argv[]){
     camera_stream_on(fd, frame);
     
     cv::cuda::GpuMat src, dst;
-    cv::Mat result, output;
+    cv::Mat result;
     
     while(1){
     
         cv::Mat src_host(720, 1280, CV_16UC1, frame);  //(2464, 3264, CV_16UC1, buffer);
         src_host.convertTo(src_host, CV_8U);
 
-        //src.upload(src_host);
+        src.upload(src_host);
 
         // Debayer here
-        //cv::cuda::cvtColor(src, dst, cv::COLOR_BayerBG2BGR); //cv::cuda::cvtColor(src, dst, cv::COLOR_BayerRGGB2RGB);
-        cv::cvtColor(src_host, result, cv::COLOR_BayerBG2BGR);
-        
+
+         cv::cuda::demosaicing(src, dst, cv::COLOR_BayerBG2BGR); //cv::cuda::cvtColor(src, dst, cv::COLOR_BayerBG2BGR); 
+                
         //cv::cuda::gammaCorrection(dst, dst, true);
 
         // have a look
        
-        //dst.download(result);
+        dst.download(result);
         
         cv::convertScaleAbs(result, result, 1.1, 2.0);
-        cv::addWeighted(result, 1.5, result, 0, 1.5, output);  
-        cv::imshow("Debayered Image", output);
+        cv::addWeighted(result, 1.5, result, 0, 1.5, result);  
+        cv::imshow("Debayered Image", result);
     
         if ((char)27 == cv::waitKey(1)){
             break;
